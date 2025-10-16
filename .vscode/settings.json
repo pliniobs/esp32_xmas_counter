@@ -21,7 +21,9 @@
     "esp_log.h": "c",
     "stdio.h": "c",
     "sys.h": "c",
-    "err.h": "c"
+    "err.h": "c",
+    "esp_lcd_panel_io.h": "c",
+    "esp_lcd_panel_ops.h": "c"
   },
   "idf.flashType": "UART"
 }
