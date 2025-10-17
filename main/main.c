@@ -23,6 +23,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "lvgl.h"
+#include "ui.h"
 
 #define LCD_NUM_NC -1
 #define LCD_PIN_NUM_MOSI 19
@@ -130,12 +131,26 @@ static void lvgl_port_task(void *arg)
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
+char strftime_buf[24];
+char strfdate_buf[24];
+char strTimeToXmas_buf[24];
+
+typedef struct {
+  int days;
+  int hours;
+  int minutes;
+  int seconds;
+} TimeUntil_t;
+TimeUntil_t TimeToChristmas;
+
+
 void app_main(void)
 {
     time_t now;
+    time_t christmas_time;
     char strftime_buf[64];
     struct tm timeinfo;
-
+    struct tm christmas;
 
 
     //Initialize NVS
@@ -173,7 +188,7 @@ void app_main(void)
     
     lv_display_set_rotation(display, LV_DISPLAY_ROTATION_90);
 
-    /*nstall LVGL tick timer*/
+    /*Install LVGL tick timer*/
     // Tick interface for LVGL (using esp_timer to generate 2ms periodic event)
     const esp_timer_create_args_t lvgl_tick_timer_args = {
         .callback = &lvgl_tick,
@@ -193,19 +208,22 @@ void app_main(void)
 	/* Run the UI */
     // Lock the mutex due to the LVGL APIs are not thread-safe
     _lock_acquire(&lvgl_api_lock);
-    //ui_init();
+    ui_init();
     _lock_release(&lvgl_api_lock);
     
     /*Create LVGL task*/
     xTaskCreate(lvgl_port_task, "LVGL", 4*4096, NULL, 2, NULL);
-    int cnt = 0;
+    
 
 
 
     esp_log_level_set("wifi", ESP_LOG_INFO);
     ESP_LOGI(TAG_MAIN, "ESP_WIFI_MODE_STA");
     wifi_initialize_station();
-
+    
+    int Screen_cnt = 0, Delay_Counter = 0;
+    
+    uint32_t time_diff = 0;
     for(;;) {
       time(&now);
       // Set timezone to UTC+3
@@ -213,9 +231,56 @@ void app_main(void)
       tzset();
 
       localtime_r(&now, &timeinfo);
-      strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-      printf("The current date/time is: %s\r\n", strftime_buf);
-      vTaskDelay(2000 / portTICK_PERIOD_MS);
+      strftime(strftime_buf, sizeof(strftime_buf), "%H:%M:%S", &timeinfo);
+      strftime(strfdate_buf, sizeof(strfdate_buf), "%d/%m/%Y", &timeinfo);
+
+      christmas = timeinfo;
+      christmas.tm_mon = 11;   // Dezembro (0 = jan, 11 = dez)
+      christmas.tm_mday = 25;
+      christmas.tm_hour = 0;
+      christmas.tm_min = 0;
+      christmas.tm_sec = 0;
+      christmas_time = mktime(&christmas);
+      // Se já passou o Natal deste ano, calcula o do próximo ano
+      if (difftime(christmas_time, now) < 0) {
+          christmas.tm_year += 1;
+          christmas_time = mktime(&christmas);
+      }
+
+      time_diff = (uint32_t)difftime(christmas_time, now);
+      TimeToChristmas.days = time_diff / 86400;
+      time_diff %= 86400;
+
+      TimeToChristmas.hours = time_diff / 3600;
+      time_diff %= 3600;
+
+      TimeToChristmas.minutes = time_diff / 60;
+      TimeToChristmas.seconds = time_diff % 60;
+
+      sprintf(strTimeToXmas_buf, "%d days %dh%dm%ds", TimeToChristmas.days, TimeToChristmas.hours, TimeToChristmas.minutes, TimeToChristmas.seconds);
+
+      //strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+      printf("The current date/time is: %s %s\r\n", strftime_buf, strfdate_buf);
+      printf("Time until Christmas: %s\r\n", strTimeToXmas_buf);
+      _lock_acquire(&lvgl_api_lock);
+      if(Screen_cnt == 0){
+        lv_disp_load_scr(uic_Screen1);
+        lv_label_set_text(uic_Label_Date, strfdate_buf);      
+        lv_label_set_text(uic_Label_Time, strftime_buf);  
+      }else if(Screen_cnt == 1){
+        lv_disp_load_scr(uic_Screen2);
+        lv_label_set_text(uic_Label_Xmas_Counter, strTimeToXmas_buf);
+      }else{
+        Screen_cnt = 0; 
+      }     
+      
+      _lock_release(&lvgl_api_lock);
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      Delay_Counter++;
+      if(Delay_Counter > 5){
+        Delay_Counter = 0;
+        Screen_cnt++;
+      }      
     }
 }
 

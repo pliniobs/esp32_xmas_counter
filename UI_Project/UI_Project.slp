@@ -1,0 +1,12 @@
+{
+    "uiExportFolderPath": "/home/plinio/workspace_esp/esp32_xmas_counter/components/UI/UI",
+    "projectExportFolderPath": "/home/plinio/workspace_esp/esp32_xmas_counter/components/UI/UI",
+    "drive_stdio": "-",
+    "drive_stdio_path": "",
+    "drive_posix": "-",
+    "drive_posix_path": "",
+    "drive_win32": "-",
+    "drive_win32_path": "",
+    "drive_fatfs": "-",
+    "drive_fatfs_path": ""
+}
